@@ -1,222 +1,160 @@
-import './style.css'
-
-const CANVAS_WIDTH = 800;
-const CANVAS_HEIGHT = 600;
-const LOOP_DELAY = 50;
+import './style.css';
 
 const canvas = document.getElementById('app');
 if (!canvas) throw Error('canvas not found');
+
 const ctx = canvas.getContext('2d');
 if (!ctx) throw Error('canvas context not found');
-const scale = window.devicePixelRatio;
-canvas.width = CANVAS_WIDTH * scale;
-canvas.height = CANVAS_HEIGHT * scale;
-ctx.scale(scale, scale);
 
-const patternSelector = document.querySelector('#pattern');
-patternSelector.addEventListener('change', reset);
+const Camera = {
+	MAX_ZOOM: 5,
+	MIN_ZOOM: 1,
+	ZOOM_SENS: 0.005,
+	isDragging: false,
+	zoomLevel: 2,
+	offset: {
+		x: window.innerWidth * window.devicePixelRatio / 2,
+		y: window.innerHeight * window.devicePixelRatio / 2,
+	},
+	dragStart: {
+		x: -1,
+		y: -1,
+	},
+	reset() {
+		Camera.offset.x = window.innerWidth * window.devicePixelRatio / 2;
+		Camera.offset.y = window.innerHeight * window.devicePixelRatio / 2;
+	},
+	init() {
+		canvas.addEventListener('mousedown', (e) => {
+			Camera.isDragging = true;
+			Camera.dragStart = {
+				x: e.clientX / Camera.zoomLevel - Camera.offset.x,
+				y: e.clientY / Camera.zoomLevel - Camera.offset.y,
+			};
+		});
+		canvas.addEventListener('mouseup', () => {
+			Camera.isDragging = false;
+			Camera.dragStart = { x: -1, y: -1 };
+		});
+		canvas.addEventListener('mouseleave', () => {
+			Camera.isDragging = false;
+			Camera.dragStart = { x: -1, y: -1 };
+		});
+		canvas.addEventListener('mousemove', (e) => {
+			if (Camera.isDragging) {
+				Camera.offset.x = e.clientX / Camera.zoomLevel - Camera.dragStart.x;
+				Camera.offset.y = e.clientY / Camera.zoomLevel - Camera.dragStart.y;
+			}
+		});
+		canvas.addEventListener('wheel', (e) => {
+			if (Camera.isDragging) {
+				return;
+			}
+			Camera.zoomLevel += -(e.deltaY * Camera.ZOOM_SENS);
+			Camera.zoomLevel = Math.min(Camera.zoomLevel, Camera.MAX_ZOOM);
+			Camera.zoomLevel = Math.max(Camera.zoomLevel, Camera.MIN_ZOOM);
+		});
+		window.addEventListener('resize', () => {
+			Camera.reset();
+			draw();
+		});
+	}
+};
 
-let intervalRef;
-let current = init(patternSelector.value);
-draw();
+const Grid = {
+	WIDTH: 80,
+	HEIGHT: 80,
+	draw() {
+		ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
+		ctx.lineWidth = 0.5;
 
-function draw() {
-	drawCells(current);
-	drawGrid();
-}
+		// place a dot at 0,0
+		ctx.fillRect(-0.5, -0.5, 1, 1);
 
-function next() {
-	const newCurrent = update(current);
-	current = newCurrent;
-	draw();
-}
+		for (let x = 0; x <= Grid.WIDTH; x += 10) {
+			ctx.beginPath();
+			ctx.moveTo(x, -Grid.WIDTH);
+			ctx.lineTo(x, Grid.WIDTH);
+			ctx.stroke();
+			if (x > 0) {
+				ctx.beginPath();
+				ctx.moveTo(-x, -Grid.WIDTH);
+				ctx.lineTo(-x, Grid.WIDTH);
+				ctx.stroke();
+			}
+		}
 
-function reset() {
-	current = init(patternSelector.value);
-	draw();
-	stop();
-}
+		for (let y = 0; y <= Grid.HEIGHT; y += 10) {
+			ctx.beginPath();
+			ctx.moveTo(-Grid.HEIGHT, y);
+			ctx.lineTo(Grid.HEIGHT, y);
+			ctx.stroke();
+			if (y > 0) {
+				ctx.beginPath();
+				ctx.moveTo(-Grid.HEIGHT, -y);
+				ctx.lineTo(Grid.HEIGHT, -y);
+				ctx.stroke();
+			}
+		}
+	}
+};
 
-function start() {
-	intervalRef = setInterval(next, LOOP_DELAY);
-}
-
-function stop() {
-	clearInterval(intervalRef);
-	intervalRef = null;
-}
+const Cells = {
+	current: [
+		[0, 3],
+		[1, 3],
+		[2, 3],
+		[1, 1],
+		[2, 2],
+	],
+	draw() {
+		for (let i = 0; i < Cells.current.length; i++) {
+			const [x, y] = Cells.current[i];
+			ctx.fillStyle = 'white';
+			ctx.fillRect(x * 10, y * 10, 10, 10);
+		}
+	}
+};
 
 window.addEventListener('keydown', (e) => {
-	switch(e.key) {
+	switch (e.key) {
 		case 'ArrowRight':
-			next();
+			update();
 			break;
 		case 'ArrowLeft':
-			reset();
+			// reset();
 			break;
 		case ' ':
-			if (intervalRef) {
-				stop();
-			} else {
-				start();
-			}
+			// if (intervalRef) {
+			// 	stop();
+			// } else {
+			// 	start();
+			// }
 			break;
 	}
 });
 
-function update(prev) {
-	const cells = window.structuredClone(prev);
-	for (let y = 0; y < CANVAS_HEIGHT / 10; y++) {
-		for (let x = 0; x < CANVAS_WIDTH / 10; x++) {
-			let alive = !!prev[x][y];
-			let neighbors = getNeighborCount(prev, x, y);
-			// Any live cell with fewer than two live neighbours dies, as if by underpopulation.
-			if (alive && neighbors < 2) {
-				cells[x][y] = 0;
-				// console.log('dead - underpopulation', { x, y, neighbors })
-			}
-			// Any live cell with two or three live neighbors lives on to the next generation.
-			else if (alive && (neighbors === 2 || neighbors === 3)) {
-				cells[x][y] = 1;
-				// console.log('liveon - 2 or 3 neighbors', { x, y, neighbors })
-			}
-			// Any live cell with more than three live neighbors dies, as if by overpopulation.
-			else if (alive && neighbors > 3) {
-				cells[x][y] = 0;
-				// console.log('dead - overpop', { x, y, neighbors })
-			}
-			// Any dead cell with exactly three live neighbors becomes a live cell, as if by reproduction.
-			else if (!alive && neighbors === 3) {
-				cells[x][y] = 1;
-				// console.log('live - reprod', { x, y, neighbors })
-			}
-		}
-	}
-	return cells;
-}
-
-function getNeighborCount(cells, x, y) {
-	const get = (x, y) => (cells[x]?.[y]) ?? 0;
-	return [
-		get(x-1, y),
-		get(x+1, y),
-		get(x, y-1),
-		get(x, y+1),
-		get(x-1, y-1),
-		get(x+1, y-1),
-		get(x-1, y+1),
-		get(x+1, y+1),
-	].filter(Boolean).length;
-}
-
-
-function glider(cells) {
-	cells[2][4] = 1;
-	cells[3][2] = 1;
-	cells[3][4] = 1;
-	cells[4][3] = 1;
-	cells[4][4] = 1;
-}
-
-function gliderGun(cells) {
-	cells[10][10] = 1;
-	cells[9][10] = 1;
-	cells[9][9] = 1;
-	cells[10][9] = 1;
-
-	cells[19][9] = 1;
-	cells[19][10] = 1;
-	cells[19][11] = 1;
-	cells[20][8] = 1;
-	cells[20][12] = 1;
-	cells[21][7] = 1;
-	cells[21][13] = 1;
-	cells[22][7] = 1;
-	cells[22][13] = 1;
-
-	cells[23][10] = 1;
-	cells[25][10] = 1;
-	cells[26][10] = 1;
-	cells[25][9] = 1;
-	cells[25][11] = 1;
-	cells[24][8] = 1;
-	cells[24][12] = 1;
-
-	cells[29][9] = 1;
-	cells[29][8] = 1;
-	cells[29][7] = 1;
-	cells[30][9] = 1;
-	cells[30][8] = 1;
-	cells[30][7] = 1;
-	cells[31][6] = 1;
-	cells[31][10] = 1;
-
-	cells[33][10] = 1;
-	cells[33][11] = 1;
-	cells[33][6] = 1;
-	cells[33][5] = 1;
-
-	cells[43][7] = 1;
-	cells[44][7] = 1;
-	cells[43][8] = 1;
-	cells[44][8] = 1;
-}
-
-function init(shape) {
-	let cells = [];
-	for (let y = 0; y < CANVAS_HEIGHT / 10; y++) {
-		for (let x = 0; x < CANVAS_WIDTH / 10; x++) {
-			if (!cells[x]) cells[x] = [];
-			cells[x][y] = 0;
-		}
-	}
-
-	switch(shape) {
-		case 'glider':
-			glider(cells);
-			break;
-		case 'glider-gun':
-			gliderGun(cells);
-			break;
-	}
-
-	return cells;
-}
-
-function drawCells(cells) {
-	for (let y = 0; y < CANVAS_HEIGHT / 10; y++) {
-		for (let x = 0; x < CANVAS_WIDTH / 10; x++) {
-			if (cells[x][y]) {
-				drawCell(x, y);
-			} else {
-				emptyCell(x, y);
-			}
-		}
+function update() {
+	for (let i = 0; i < Grid.WIDTH * Grid.HEIGHT; i++) {
+		const x = (i % Grid.WIDTH) - Math.floor(Grid.WIDTH / 2);
+		const y = Math.floor(i / Grid.WIDTH) - Math.floor(Grid.HEIGHT / 2);
+		console.log({ x, y });
 	}
 }
 
-function drawCell(x, y) {
-	ctx.fillStyle = 'white';
-	ctx.fillRect(x*10, y*10, 10, 10);
+function draw() {
+	canvas.width = window.innerWidth * window.devicePixelRatio;
+	canvas.height = window.innerHeight * window.devicePixelRatio;
+	const scale = window.devicePixelRatio * Camera.zoomLevel;
+	ctx.translate(canvas.width / 2, canvas.height / 2);
+	ctx.scale(scale, scale);
+	ctx.translate(-canvas.width / 2 + Camera.offset.x, -canvas.height / 2 + Camera.offset.y);
+	ctx.clearRect(0, 0, window.innerWidth, window.innerHeight);
+	// -----
+	Cells.draw();
+	Grid.draw();
+	requestAnimationFrame(draw);
 }
 
-function emptyCell(x, y) {
-	ctx.clearRect(x*10, y*10, 10, 10);
-}
-
-function drawGrid() {
-	ctx.strokeStyle = 'rgba(255, 255, 255, 0.5)';
-	ctx.lineWidth = 0.5;
-	for (let x = 10; x < CANVAS_WIDTH; x += 10) {
-		ctx.beginPath();
-		ctx.moveTo(x, 0);
-		ctx.lineTo(x, CANVAS_HEIGHT);
-		ctx.stroke();
-	}
-	for (let y = 10; y <= CANVAS_WIDTH; y += 10) {
-		ctx.beginPath();
-		ctx.moveTo(0, y);
-		ctx.lineTo(CANVAS_WIDTH, y);
-		ctx.stroke();
-	}
-}
+Camera.init();
+draw();
