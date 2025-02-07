@@ -16,6 +16,12 @@ ctx.scale(scale, scale);
 const patternSelector = document.querySelector('#pattern');
 patternSelector.addEventListener('change', reset);
 
+const playPauseBtn = document.querySelector('#play-pause');
+playPauseBtn.addEventListener('click', () => intervalRef ? stop() : start());
+
+const restartBtn = document.querySelector('#restart');
+restartBtn.addEventListener('click', reset);
+
 let intervalRef;
 let current = init(patternSelector.value);
 draw();
@@ -39,15 +45,17 @@ function reset() {
 
 function start() {
 	intervalRef = setInterval(next, LOOP_DELAY);
+	playPauseBtn.innerHTML = 'Pause';
 }
 
 function stop() {
 	clearInterval(intervalRef);
 	intervalRef = null;
+	playPauseBtn.innerHTML = 'Play';
 }
 
 window.addEventListener('keydown', (e) => {
-	switch(e.key) {
+	switch (e.key) {
 		case 'ArrowRight':
 			next();
 			break;
@@ -98,14 +106,14 @@ function update(prev) {
 function getNeighborCount(cells, x, y) {
 	const get = (x, y) => (cells[x]?.[y]) ?? 0;
 	return [
-		get(x-1, y),
-		get(x+1, y),
-		get(x, y-1),
-		get(x, y+1),
-		get(x-1, y-1),
-		get(x+1, y-1),
-		get(x-1, y+1),
-		get(x+1, y+1),
+		get(x - 1, y),
+		get(x + 1, y),
+		get(x, y - 1),
+		get(x, y + 1),
+		get(x - 1, y - 1),
+		get(x + 1, y - 1),
+		get(x - 1, y + 1),
+		get(x + 1, y + 1),
 	].filter(Boolean).length;
 }
 
@@ -171,7 +179,7 @@ function init(shape) {
 		}
 	}
 
-	switch(shape) {
+	switch (shape) {
 		case 'glider':
 			glider(cells);
 			break;
@@ -197,11 +205,11 @@ function drawCells(cells) {
 
 function drawCell(x, y) {
 	ctx.fillStyle = 'white';
-	ctx.fillRect(x*10, y*10, 10, 10);
+	ctx.fillRect(x * 10, y * 10, 10, 10);
 }
 
 function emptyCell(x, y) {
-	ctx.clearRect(x*10, y*10, 10, 10);
+	ctx.clearRect(x * 10, y * 10, 10, 10);
 }
 
 function drawGrid() {

@@ -2,18 +2,27 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+	<link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png">
+	<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png">
+	<link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png">
+	<link rel="manifest" href="/site.webmanifest">
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Vite App</title>
+    <title>Conway's Game of Life</title>
   </head>
   <body>
 
-	<div class="pattern-selector">
-		<label for="pattern">Pattern</label>
-		<select name="pattern" id="pattern">
-		  <option value="glider">Glider</option>
-		  <option value="glider-gun">Glider Gun</option>
-		</select>
+	<div class="top-bar">
+		<div class="pattern-selector">
+			<label for="pattern">Pattern</label>
+			<select name="pattern" id="pattern">
+			  <option value="glider">Glider</option>
+			  <option value="glider-gun">Glider Gun</option>
+			</select>
+		</div>
+		<div class="controls">
+			<button id="play-pause">Play</button>
+			<button id="restart">Restart</button>
+		</div>
 	</div>
 
     <canvas id="app" width="800px" height="600px"></canvas>

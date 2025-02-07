@@ -32,6 +32,19 @@ canvas {
 	height: 600px;
 }
 
+.top-bar {
+	width: 100%;
+	max-width: 800px;
+	display: flex;
+	align-items: end;
+	gap: 1rem;
+}
+
+.controls {
+	display: flex;
+	gap: 0.5rem;
+}
+
 .pattern-selector {
 	display: flex;
 	flex-direction: column;
